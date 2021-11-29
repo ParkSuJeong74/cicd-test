@@ -1,0 +1,47 @@
+# Java CI with Gradle
+name: test_CI
+
+on:
+  pull_request:
+    branches: [ master ]
+    
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up JDK 11
+      uses: actions/setup-java@v2
+      with:
+        java-version: '11'
+        distribution: 'adopt'
+        
+    # Caching
+    - name: Cache Gradle packages
+      uses: actions/cache@v2
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+   # Build
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+    - name: Build with Gradle
+      run: ./gradlew build
+      
+    # Test Results Report 
+    - name: Publish Unit Test Results
+      uses: EnricoMi/publish-unit-test-result-action@v1
+      if: ${{ always() }}  # 테스트 실패해도 Report
+      with:
+        files: build/test-results/**/*.xml
+        
+    # Remove some files from the Gradle cache, so they aren't cached by GitHub Actions.
+    - name: Cleanup Gradle Cache
+      run: |
+        rm -f ~/.gradle/caches/modules-2/modules-2.lock
+        rm -f ~/.gradle/caches/modules-2/gc.properties
