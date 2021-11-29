@@ -35,3 +35,9 @@ dependencies {
 test {
 	useJUnitPlatform()
 }
+
+bootJar {
+	archiveBaseName = "cicd-test" 
+    archiveFileName = "cicd-test.jar" 
+    archiveVersion = "0.0.1" 
+}
