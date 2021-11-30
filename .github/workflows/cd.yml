@@ -1,0 +1,87 @@
+# Deploy to Amazon EC2
+name: cd
+
+on:
+  push:
+    branches:
+      - master
+env:
+  DOCKER_IMAGE: ghcr.io/parksujeong74/cicd
+  VERSION: ${{ github.sha }}
+
+jobs:
+  build:
+    runs-on: ubuntu-lastest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      
+    # build
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+    - name: Build with Gradle
+      run: ./gradlew build
+      
+    # docker build start
+    - name: Set up docker buildx
+      id: buildx
+      uses: docker/setup-buildx-action@v1
+      
+    # Caching
+    - name: Cache docker layers
+      uses: actions/cache@v2
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ env.VERSION }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
+          
+    # github container registry login
+    - name: Login to ghcr
+      uses: docker/login-action@v1
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.CR_PAT }}
+          
+    # docker push
+    - name: Build and push
+      id: docker_build
+      uses: docker/build-push-action@v2
+      with:
+        file: ./docker
+        builder: ${{ steps.buildx.outputs.name }}
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ env.DOCKER_IMAGE }}:${{ env.VERSION }}
+
+  deploy:
+    needs: build
+    name: Deploy
+    runs-on: [ self-hosted, label-test ]
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      
+    # github container registry login
+    - name: Login to ghcr
+      uses: docker/login-action@v1
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.CR_PAT }}
+        
+    # server Docker build
+    - name: Docker run
+      run: |
+        docker ps -q --filter "name=cat" | grep -q . && docker stop cat && docker rm -fv cat
+        docker run -d -p 8000:8000 --name cicd --restart always ${{ env.DOCKER_IMAGE }}:${{ env.VERSION }}
+      
+  cleanup:
+    needs: [ build, deploy ]
+    name: Clean up docker images
+    runs-on: [ self-hosted, label-test ]
+    steps:
+      # clean
+      - name: Clean up docker images
+        run:
+          docker rmi $(docker images --filter "before=${{ env.DOCKER_IMAGE }}:${{ env.VERSION }}" --filter=reference="${{ env.DOCKER_IMAGE }}:*" -q)
