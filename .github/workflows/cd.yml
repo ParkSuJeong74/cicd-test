@@ -62,14 +62,6 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
       
-    # github container registry login
-    - name: Login to ghcr
-      uses: docker/login-action@v1
-      with:
-        registry: ghcr.io
-        username: ${{ github.repository_owner }}
-        password: ${{ secrets.CR_PAT }}
-        
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
@@ -84,12 +76,7 @@ jobs:
       working-directory: ${{ env.working-directory }}
       run: aws ecs update-service --cluster main --service api-server --force-new-deployment
       
-  cleanup:
-    needs: [ build, deploy ]
-    name: Clean up docker images
-    runs-on: ubuntu-lastest
-    steps:
       # clean
-      - name: Clean up docker images
-        run:
-          docker rmi $(docker images --filter "before=${{ env.DOCKER_IMAGE }}:${{ env.VERSION }}" --filter=reference="${{ env.DOCKER_IMAGE }}:*" -q)
+    - name: Clean up docker images
+      run:
+        docker rmi $(docker images --filter "before=${{ env.DOCKER_IMAGE }}:${{ env.VERSION }}" --filter=reference="${{ env.DOCKER_IMAGE }}:*" -q)
