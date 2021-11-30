@@ -7,7 +7,7 @@ on:
       - master
 env:
   DOCKER_IMAGE: ghcr.io/parksujeong74/cicd
-  VERSION: ${{ github.sha }}
+  VERSION: latest
 
 jobs:
   build:
